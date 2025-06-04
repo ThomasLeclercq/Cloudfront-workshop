@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Image Transformer Lambda using Sharp and AWS SDK v3
+
+Globals:
+  Function:
+    Timeout: 10
+    Runtime: nodejs22.x
+    Architectures:
+      - x86_64
+    MemorySize: 1024
+
+Resources:
+
+  ImageResizerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: cloudfront-workshop-image-resizer
+      CodeUri: .
+      Handler: index.handler
+      Role: !GetAtt LambdaEdgeExecutionRole.Arn
+
+  LambdaEdgeExecutionRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: lambda-edge-execution-role
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+                  - edgelambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: LambdaEdgeS3AndLogsPolicy
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: "*"
+                - Effect: Allow
+                  Action:
+                    - s3:GetObject
+                    - s3:PutObject
+                    - s3:HeadObject
+                  Resource: "arn:aws:s3:::cloudfront-workshop/*"
+
