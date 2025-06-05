@@ -12,42 +12,82 @@ Globals:
 
 Resources:
 
+  WorkshopBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: cloudfront-tech-team-workshop-2
+
+  SharpNodeLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: sharp-node-layer
+      Description: Precompiled Sharp binary for Lambda
+      ContentUri: sharp-layer/
+      CompatibleRuntimes:
+        - nodejs22.x
+      RetentionPolicy: Delete
+
+  ImageApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: image-api
+      StageName: Prod
+      BinaryMediaTypes:
+        - image/jpeg
+        - image/png
+        - image/webp
+        - image/avif
+
   ImageResizerFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: cloudfront-workshop-image-resizer
+      FunctionName: cloudfront-workshop-sharp-image-resizer
       CodeUri: .
       Handler: index.handler
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref WorkshopBucket
+      Events:
+        ImageApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ImageApi
+            RequestParameters:
+              - method.request.header.Accept
+            Path: /original/{proxy+}
+            Method: get
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
+      Layers:
+        - !Ref SharpNodeLayer
 
   LambdaEdgeExecutionRole:
-      Type: AWS::IAM::Role
-      Properties:
-        RoleName: lambda-edge-execution-role
-        AssumeRolePolicyDocument:
-          Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service:
-                  - lambda.amazonaws.com
-                  - edgelambda.amazonaws.com
-              Action: sts:AssumeRole
-        Policies:
-          - PolicyName: LambdaEdgeS3AndLogsPolicy
-            PolicyDocument:
-              Version: "2012-10-17"
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - logs:CreateLogGroup
-                    - logs:CreateLogStream
-                    - logs:PutLogEvents
-                  Resource: "*"
-                - Effect: Allow
-                  Action:
-                    - s3:GetObject
-                    - s3:PutObject
-                    - s3:HeadObject
-                  Resource: "arn:aws:s3:::cloudfront-workshop/*"
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: cloudfront-workshop-execution-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - edgelambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaS3AndLogsPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:HeadObject
+                Resource: !Sub "arn:aws:s3:::${WorkshopBucket}/*"
 
