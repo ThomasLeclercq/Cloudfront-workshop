@@ -33,10 +33,7 @@ Resources:
       Name: image-api
       StageName: Prod
       BinaryMediaTypes:
-        - image/jpeg
-        - image/png
-        - image/webp
-        - image/avif
+        - image/*
 
   ImageResizerFunction:
     Type: AWS::Serverless::Function
@@ -54,6 +51,7 @@ Resources:
             RestApiId: !Ref ImageApi
             RequestParameters:
               - method.request.header.Accept
+              - method.request.header.ContentType
             Path: /original/{proxy+}
             Method: get
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
